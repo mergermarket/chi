@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -240,6 +241,80 @@ func TestMuxMounts(t *testing.T) {
 		t.Fatalf(body)
 	}
 	if _, body := testRequest(t, ts, "GET", "/sharing/aBc/share/twitter", nil); body != "/aBc/share/twitter" {
+		t.Fatalf(body)
+	}
+}
+
+func TestMuxMountEmptyPath(t *testing.T) {
+	r := NewRouter()
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("/"))
+	})
+
+	m := NewRouter()
+	m.Mount("/sharing", r)
+
+	ts := httptest.NewServer(m)
+	defer ts.Close()
+
+	if _, body := testRequest(t, ts, "GET", "/sharing", nil); body != "/" {
+		t.Fatalf(body)
+	}
+	if _, body := testRequest(t, ts, "GET", "/sharing/", nil); body != "/" {
+		t.Fatalf(body)
+	}
+	if _, body := testRequest(t, ts, "GET", "/sharing/nothing-here", nil); strings.Contains(body, "404") == false {
+		t.Fatalf(body)
+	}
+}
+
+func TestMuxMountEmptyMountAndEmptyPath(t *testing.T) {
+	r := NewRouter()
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("/"))
+	})
+
+	m := NewRouter()
+	m.Mount("/", r)
+
+	ts := httptest.NewServer(m)
+	defer ts.Close()
+
+	if _, body := testRequest(t, ts, "GET", "/", nil); body != "/" {
+		t.Fatalf(body)
+	}
+	if _, body := testRequest(t, ts, "GET", "/nothing-here", nil); strings.Contains(body, "404") == false {
+		t.Logf(fmt.Sprintf("body: \"%s\"", body))
+		t.Fatalf(body)
+	}
+}
+
+func TestMuxMountMountMount(t *testing.T) {
+	r := NewRouter()
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("/"))
+	})
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("/"))
+	})
+
+	o := NewRouter()
+	o.Mount("/", r)
+
+	m := NewRouter()
+	m.Mount("/sharing", o)
+
+	ts := httptest.NewServer(m)
+	defer ts.Close()
+
+	if _, body := testRequest(t, ts, "GET", "/sharing", nil); body != "/" {
+		t.Fatalf(body)
+	}
+	if _, body := testRequest(t, ts, "GET", "/nothing-here", nil); strings.Contains(body, "404") == false {
+		t.Logf(fmt.Sprintf("body: \"%s\"", body))
 		t.Fatalf(body)
 	}
 }
@@ -499,7 +574,13 @@ func TestMuxComplicatedNotFound(t *testing.T) {
 	if _, body := testRequest(t, ts, "GET", "/public", nil); body != "public get" {
 		t.Fatalf(body)
 	}
+	if _, body := testRequest(t, ts, "GET", "/public/", nil); body != "public get" {
+		t.Fatalf(body)
+	}
 	if _, body := testRequest(t, ts, "GET", "/private/resource", nil); body != "private get" {
+		t.Fatalf(body)
+	}
+	if _, body := testRequest(t, ts, "GET", "/private/resource/", nil); body != "private get" {
 		t.Fatalf(body)
 	}
 	// check custom not-found on all levels
@@ -519,13 +600,7 @@ func TestMuxComplicatedNotFound(t *testing.T) {
 	if _, body := testRequest(t, ts, "GET", "/auth/", nil); body != "custom not-found" {
 		t.Fatalf(body)
 	}
-	if _, body := testRequest(t, ts, "GET", "/public/", nil); body != "custom not-found" {
-		t.Fatalf(body)
-	}
 	if _, body := testRequest(t, ts, "GET", "/private/", nil); body != "custom not-found" {
-		t.Fatalf(body)
-	}
-	if _, body := testRequest(t, ts, "GET", "/private/resource/", nil); body != "custom not-found" {
 		t.Fatalf(body)
 	}
 }
@@ -788,7 +863,7 @@ func TestMuxBig(t *testing.T) {
 		t.Fatalf("got '%s'", body)
 	}
 	_, body = testRequest(t, ts, "GET", "/folders", nil)
-	if body != "404 page not found\n" {
+	if body != "/folders/ reqid:1 session:elvis" {
 		t.Fatalf("got '%s'", body)
 	}
 	_, body = testRequest(t, ts, "GET", "/folders/", nil)
