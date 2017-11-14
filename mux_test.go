@@ -571,6 +571,9 @@ func TestMuxComplicatedNotFound(t *testing.T) {
 	if _, body := testRequest(t, ts, "GET", "/auth", nil); body != "auth get" {
 		t.Fatalf(body)
 	}
+	if _, body := testRequest(t, ts, "GET", "/auth/", nil); body != "auth get" {
+		t.Fatalf(body)
+	}
 	if _, body := testRequest(t, ts, "GET", "/public", nil); body != "public get" {
 		t.Fatalf(body)
 	}
@@ -594,10 +597,6 @@ func TestMuxComplicatedNotFound(t *testing.T) {
 		t.Fatalf(body)
 	}
 	if _, body := testRequest(t, ts, "GET", "/private/resource/nope", nil); body != "custom not-found" {
-		t.Fatalf(body)
-	}
-	// check custom not-found on trailing slash routes
-	if _, body := testRequest(t, ts, "GET", "/auth/", nil); body != "custom not-found" {
 		t.Fatalf(body)
 	}
 	if _, body := testRequest(t, ts, "GET", "/private/", nil); body != "custom not-found" {
@@ -863,7 +862,7 @@ func TestMuxBig(t *testing.T) {
 		t.Fatalf("got '%s'", body)
 	}
 	_, body = testRequest(t, ts, "GET", "/folders", nil)
-	if body != "/folders/ reqid:1 session:elvis" {
+	if body != "404 page not found\n" {
 		t.Fatalf("got '%s'", body)
 	}
 	_, body = testRequest(t, ts, "GET", "/folders/", nil)
@@ -1144,7 +1143,6 @@ func TestMuxSubroutes(t *testing.T) {
 	defer ts.Close()
 
 	var body, expected string
-	var resp *http.Response
 
 	_, body = testRequest(t, ts, "GET", "/hubs/123/view", nil)
 	expected = "hub1"
@@ -1161,9 +1159,9 @@ func TestMuxSubroutes(t *testing.T) {
 	if body != expected {
 		t.Fatalf("expected:%s got:%s", expected, body)
 	}
-	resp, body = testRequest(t, ts, "GET", "/hubs/123/users/", nil)
-	expected = "404 page not found\n"
-	if resp.StatusCode != 404 || body != expected {
+	_, body = testRequest(t, ts, "GET", "/hubs/123/users/", nil)
+	expected = "hub3"
+	if body != expected {
 		t.Fatalf("expected:%s got:%s", expected, body)
 	}
 	_, body = testRequest(t, ts, "GET", "/accounts/44", nil)
